@@ -19,20 +19,20 @@ This repository is intended as a small utility for private use and testing.
 - `yt-dlp`
 - `python-telegram-bot` (if using the Telegram bot)
 
-If you prefer, you can use the included virtual environment under `tg_bot`, or create your own.
+If you prefer, you can use the included virtual environment under `bot_env`, or create your own.
 
 ## Setup
 
 1. (Optional) Create a virtual environment:
 
 ```powershell
-python -m venv tg_bot
+python -m venv bot_env
 ```
 
 2. Activate the virtual environment (PowerShell example):
 
 ```powershell
-.\tg_bot\Scripts\Activate.ps1
+.\bot_env\Scripts\Activate.ps1
 ```
 
 3. Install dependencies. If you have a `requirements.txt`, use it; otherwise install the main packages:
@@ -43,7 +43,7 @@ pip install yt-dlp python-telegram-bot
 
 ## Configuration
 
-- Telegram bot: set your bot token as an environment variable named `TELEGRAM_TOKEN`, or edit the bot's config file if one exists in `tg_bot/`.
+- Telegram bot: set your bot token as an environment variable named `TELEGRAM_TOKEN`, or edit the bot's config file if one exists in `bot_env/`.
 - (Optional) Adjust any download options inside `downloader.py`.
 
 Example (PowerShell):
@@ -63,7 +63,7 @@ python downloader.py <URL>
 - Run the Telegram bot (replace `bot_script.py` with your bot entrypoint if different):
 
 ```powershell
-python tg_bot/bot_script.py
+python bot_env/bot_script.py
 ```
 
 If your bot script is named differently, run that file instead.
@@ -96,7 +96,7 @@ This project is provided for personal/educational use. Respect copyright and the
 ## Files of interest
 
 - `downloader.py`: downloader entrypoint used to fetch media.
-- `tg_bot/`: virtualenv and bot-related files (edit or add your bot script here).
+- `bot_env/`: virtualenv and bot-related files (edit or add your bot script here).
 
 ## License
 
