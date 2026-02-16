@@ -37,7 +37,7 @@ request = HTTPXRequest(
 
 # Start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Welcome to the YouTube/TikTok Downloader Bot! Send me a link to download media.")
+    await update.message.reply_text("Welcome to the All-in-One Video Downloader Bot! Send me a link to download media.")
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
@@ -101,10 +101,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # If it's a common video type and small enough, send as video; otherwise send as document
                 if file_size <= 50 * 1024 * 1024 and ext in ('.mp4', '.mkv', '.webm', '.mov', '.avi'):
                     with open(file_path, "rb") as f:
-                        await update.message.reply_video(video=f, caption="Downloaded by @YouTube_TikTok_Downloader_MM_bot")
+                        await update.message.reply_video(video=f, caption="Downloaded by @videos_downloader_mm_bot")
                 else:
                     with open(file_path, "rb") as f:
-                        await update.message.reply_document(document=f, caption="Downloaded by @YouTube_TikTok_Downloader_MM_bot")
+                        await update.message.reply_document(document=f, caption="Downloaded by @videos_downloader_mm_bot")
 
                 os.remove(file_path)
                 break
