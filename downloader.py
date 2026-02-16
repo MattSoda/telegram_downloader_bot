@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 # TOKEN = os.environ.get("8500282127:AAEJHUNhND70Nti4ngnbQTEAI7ZK63ix-7M")
-TOKEN = "8500282127:AAEJHUNhND70Nti4ngnbQTEAI7ZK63ix-7M"
+TOKEN = "8572208060:AAGw-2oMuhLRpP6JdXJMXgYjZH9xcM4rt8k"
 
 # Detect ffmpeg: first check PATH, then a common downloads location
 FFMPEG_PATH = shutil.which("ffmpeg")
