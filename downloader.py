@@ -11,7 +11,7 @@ import time
 logging.basicConfig(level=logging.INFO)
 
 
-TOKEN = "8500282127:AAGJaZG1QlGL9FQcZOb5w4dkXAH1h2I2Ebg"
+TOKEN = os.environ.get("8500282127:AAEJHUNhND70Nti4ngnbQTEAI7ZK63ix-7M")
 
 # Detect ffmpeg: first check PATH, then a common downloads location
 FFMPEG_PATH = shutil.which("ffmpeg")
