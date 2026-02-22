@@ -7,6 +7,8 @@ import os
 import shutil
 from pathlib import Path
 import time
+import tempfile
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -46,23 +48,56 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 # Download - returns the downloaded file path
 def download_video(url):
     os.makedirs('downloads', exist_ok=True)
+
     ydl_opts = {
-    'format': 'bestvideo+bestaudio/best',
-    'outtmpl': 'downloads/%(title)s.%(ext)s',
-    'merge_output_format': 'mp4',
-    'quiet': True,
-    'no_warnings': True,
-    'socket_timeout': 60,
-    'retries': 10,
-    'http_chunk_size': 1048576,
-    'http_headers': {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://www.tiktok.com/'
-    },
-    
-    # optional if you need a proxy:
-    # 'proxy': 'http://HOST:PORT',
-}
+        'format': 'bestvideo+bestaudio/best',
+        'outtmpl': 'downloads/%(title)s.%(ext)s',
+        'merge_output_format': 'mp4',
+        'quiet': True,
+        'no_warnings': True,
+        'socket_timeout': 60,
+        'retries': 10,
+        'http_chunk_size': 1048576,
+        'noplaylist': True,
+    }
+
+    # Detect YouTube URLs
+    if "youtube.com" in url or "youtu.be" in url:
+        # ydl_opts['cookiefile'] = 'cookies.txt'
+
+        if "youtube.com" in url or "youtu.be" in url:
+            cookies_content = os.environ.get("YT_COOKIES")
+
+            if cookies_content:
+                temp_cookie = tempfile.NamedTemporaryFile(delete=False)
+                temp_cookie.write(cookies_content.encode())
+                temp_cookie.close()
+                ydl_opts['cookiefile'] = temp_cookie.name
+                    
+        ydl_opts['http_headers'] = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+
+    if FFMPEG_PATH:
+        ydl_opts['ffmpeg_location'] = FFMPEG_PATH
+
+    max_attempts = 3
+    backoff = 2
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                file_path = ydl.prepare_filename(info)
+            return file_path
+        except Exception as e:
+            logging.exception("Download attempt %s failed", attempt)
+            if attempt == max_attempts:
+                raise
+            time.sleep(backoff)
+            backoff *= 2
+
+            
     if FFMPEG_PATH:
         ydl_opts['ffmpeg_location'] = FFMPEG_PATH
 
