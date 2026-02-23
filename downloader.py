@@ -8,6 +8,8 @@ import shutil
 from pathlib import Path
 import time
 import tempfile
+import base64
+from typing import Optional
 
 
 logging.basicConfig(level=logging.INFO)
@@ -45,6 +47,52 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logging.exception("Unhandled exception in update handler", exc_info=context.error)
 
+
+def _is_youtube_url(url: str) -> bool:
+    return "youtube.com" in url or "youtu.be" in url
+
+
+def _build_cookie_file_from_env() -> Optional[str]:
+    # Preferred: mount a cookies file and pass its path.
+    cookie_file = os.environ.get("YT_COOKIE_FILE") or os.environ.get("YT_COOKIES_FILE")
+    if cookie_file:
+        if os.path.exists(cookie_file):
+            return cookie_file
+        logging.warning("Cookie file path set but not found: %s", cookie_file)
+
+    # Optional: pass cookies as base64 to avoid multiline env var issues.
+    cookies_b64 = os.environ.get("YT_COOKIES_B64")
+    if cookies_b64:
+        try:
+            decoded = base64.b64decode(cookies_b64).decode("utf-8", errors="ignore")
+            cookie_text = decoded
+        except Exception:
+            logging.exception("Failed to decode YT_COOKIES_B64")
+            cookie_text = None
+    else:
+        cookie_text = os.environ.get("YT_COOKIES")
+
+    if not cookie_text:
+        return None
+
+    # Render/env UIs often store newlines escaped as '\n' in a single line.
+    normalized = cookie_text.replace("\r\n", "\n")
+    if "\\n" in normalized:
+        normalized = normalized.replace("\\n", "\n")
+    normalized = normalized.strip() + "\n"
+
+    temp_cookie = tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        suffix=".txt",
+        delete=False,
+        newline="\n",
+    )
+    temp_cookie.write(normalized)
+    temp_cookie.close()
+    return temp_cookie.name
+
+
 # Download - returns the downloaded file path
 def download_video(url):
     os.makedirs('downloads', exist_ok=True)
@@ -61,19 +109,17 @@ def download_video(url):
         'noplaylist': True,
     }
 
-    # Detect YouTube URLs
-    if "youtube.com" in url or "youtu.be" in url:
-        # ydl_opts['cookiefile'] = 'cookies.txt'
+    temp_cookie_path = None
+    if _is_youtube_url(url):
+        temp_cookie_path = _build_cookie_file_from_env()
+        if temp_cookie_path:
+            ydl_opts['cookiefile'] = temp_cookie_path
+            logging.info("Using cookies for YouTube download")
+        else:
+            logging.warning(
+                "No valid YouTube cookies found (YT_COOKIE_FILE / YT_COOKIES_FILE / YT_COOKIES_B64 / YT_COOKIES)."
+            )
 
-        if "youtube.com" in url or "youtu.be" in url:
-            cookies_content = os.environ.get("YT_COOKIES")
-
-            if cookies_content:
-                temp_cookie = tempfile.NamedTemporaryFile(delete=False)
-                temp_cookie.write(cookies_content.encode())
-                temp_cookie.close()
-                ydl_opts['cookiefile'] = temp_cookie.name
-                    
         ydl_opts['http_headers'] = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
@@ -84,38 +130,28 @@ def download_video(url):
     max_attempts = 3
     backoff = 2
 
-    for attempt in range(1, max_attempts + 1):
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                file_path = ydl.prepare_filename(info)
-            return file_path
-        except Exception as e:
-            logging.exception("Download attempt %s failed", attempt)
-            if attempt == max_attempts:
-                raise
-            time.sleep(backoff)
-            backoff *= 2
-
-            
-    if FFMPEG_PATH:
-        ydl_opts['ffmpeg_location'] = FFMPEG_PATH
-
-    # Retry/backoff loop for transient download errors
-    max_attempts = 3
-    backoff = 2
-    for attempt in range(1, max_attempts + 1):
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                file_path = ydl.prepare_filename(info)
-            return file_path
-        except Exception as e:
-            logging.exception("Download attempt %s failed", attempt)
-            if attempt == max_attempts:
-                raise
-            time.sleep(backoff)
-            backoff *= 2
+    try:
+        for attempt in range(1, max_attempts + 1):
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                    file_path = ydl.prepare_filename(info)
+                return file_path
+            except Exception:
+                logging.exception("Download attempt %s failed", attempt)
+                if attempt == max_attempts:
+                    raise
+                time.sleep(backoff)
+                backoff *= 2
+    finally:
+        # Only clean up temp cookie files created from env text/base64.
+        if temp_cookie_path and os.path.exists(temp_cookie_path):
+            configured_path = os.environ.get("YT_COOKIE_FILE") or os.environ.get("YT_COOKIES_FILE")
+            if not configured_path or os.path.abspath(temp_cookie_path) != os.path.abspath(configured_path):
+                try:
+                    os.remove(temp_cookie_path)
+                except OSError:
+                    logging.warning("Failed to remove temporary cookie file: %s", temp_cookie_path)
 
 # Message Handler
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
