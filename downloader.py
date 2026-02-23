@@ -93,6 +93,20 @@ def _build_cookie_file_from_env() -> Optional[str]:
     return temp_cookie.name
 
 
+def _get_youtube_extractor_args() -> dict:
+    # Use non-web clients by default; they are often less affected by BotGuard checks.
+    player_clients_raw = os.environ.get("YT_PLAYER_CLIENTS", "tv,android_vr")
+    player_clients = [c.strip() for c in player_clients_raw.split(",") if c.strip()]
+    args = {'player_client': player_clients}
+
+    # Pass PO token exactly as yt-dlp expects, e.g. "mweb.gvs+<token>".
+    po_token = os.environ.get("YT_PO_TOKEN")
+    if po_token:
+        args['po_token'] = [po_token.strip()]
+
+    return {'youtube': args}
+
+
 # Download - returns the downloaded file path
 def download_video(url):
     os.makedirs('downloads', exist_ok=True)
@@ -112,14 +126,22 @@ def download_video(url):
     temp_cookie_path = None
     if _is_youtube_url(url):
         temp_cookie_path = _build_cookie_file_from_env()
+        cookie_source = "env"
+        if not temp_cookie_path:
+            local_cookie = Path(__file__).with_name("cookies.txt")
+            if local_cookie.exists():
+                temp_cookie_path = str(local_cookie)
+                cookie_source = "local_file"
+
         if temp_cookie_path:
             ydl_opts['cookiefile'] = temp_cookie_path
-            logging.info("Using cookies for YouTube download")
+            logging.info("Using cookies for YouTube download (%s)", cookie_source)
         else:
             logging.warning(
-                "No valid YouTube cookies found (YT_COOKIE_FILE / YT_COOKIES_FILE / YT_COOKIES_B64 / YT_COOKIES)."
+                "No valid YouTube cookies found (YT_COOKIE_FILE / YT_COOKIES_FILE / YT_COOKIES_B64 / YT_COOKIES / local cookies.txt)."
             )
 
+        ydl_opts['extractor_args'] = _get_youtube_extractor_args()
         ydl_opts['http_headers'] = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
@@ -147,7 +169,14 @@ def download_video(url):
         # Only clean up temp cookie files created from env text/base64.
         if temp_cookie_path and os.path.exists(temp_cookie_path):
             configured_path = os.environ.get("YT_COOKIE_FILE") or os.environ.get("YT_COOKIES_FILE")
-            if not configured_path or os.path.abspath(temp_cookie_path) != os.path.abspath(configured_path):
+            local_cookie_path = str(Path(__file__).with_name("cookies.txt"))
+            keep_file = False
+            if configured_path and os.path.abspath(temp_cookie_path) == os.path.abspath(configured_path):
+                keep_file = True
+            if os.path.abspath(temp_cookie_path) == os.path.abspath(local_cookie_path):
+                keep_file = True
+
+            if not keep_file:
                 try:
                     os.remove(temp_cookie_path)
                 except OSError:
